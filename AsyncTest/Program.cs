@@ -71,14 +71,19 @@ namespace AsyncTest
 
         private static void TestConcurrentSimultaneousSeveralVariablesAccess()
         {
+            var lc = new SpinLock();
+
             Task.Run(() =>
             {
                 while (true)
                 {
+                    bool taken = false;
+                    lc.Enter(ref taken);
                     Volatile.Write(ref _b, 6);
                     Volatile.Write(ref _a, 5);
                     Volatile.Write(ref _a, Volatile.Read(ref _b));
                     Volatile.Write(ref _b, 5);
+                    lc.Exit();
                 }
             });
 
@@ -86,8 +91,11 @@ namespace AsyncTest
             {
                 while (true)
                 {
+                    bool taken = false;
+                    lc.Enter(ref taken);
                     if (Volatile.Read(ref _a) == 5 && Volatile.Read(ref _b) == 5)
                         Console.WriteLine("Got it!");
+                    lc.Exit();
                 }
             });
         }
