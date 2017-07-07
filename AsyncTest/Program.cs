@@ -6,6 +6,41 @@ using System.Threading.Tasks;
 
 namespace AsyncTest
 {
+    public class ContainerSpecial1
+    {
+        private LinkedList<int> _container;
+        private object _sync = new object();
+
+        public ContainerSpecial1()
+        {
+            _container = new LinkedList<int>();
+        }
+
+        public void Place(int num)
+        {
+            Monitor.Enter(_sync);
+            _container.AddFirst(num);
+            Monitor.Pulse(_sync);
+            Monitor.Exit(_sync);
+        }
+
+        public void Pop()
+        {
+            Monitor.Enter(_sync);
+            while (_container.Count == 0)
+                Monitor.Wait(_sync); // possible deadlock due all threads will wait to pop
+
+            _container.RemoveLast();
+
+            Monitor.Exit(_sync);
+        }
+
+        public long Count()
+        {
+            return _container.Count;
+        }
+    }
+
     public class Container
     {
         private LinkedList<int> _container;
@@ -21,32 +56,32 @@ namespace AsyncTest
 
         public void Place(int num)
         {
-            bool lockTaken = false;
-            _slimSync.Enter(ref lockTaken);
-            if (!lockTaken)
-                Console.WriteLine("Lock isn't taken");
+            //bool lockTaken = false;
+            //_slimSync.Enter(ref lockTaken);
+            //if (!lockTaken)
+            //    Console.WriteLine("Lock isn't taken");
             //_rwl.AcquireWriterLock(TimeSpan.FromSeconds(2));
             //_rwls.EnterWriteLock();
-            //lock(_sync)
+            lock(_sync)
             _container.AddFirst(num);
             //_rwls.ExitWriteLock();
             //_rwl.ReleaseWriterLock();
-            _slimSync.Exit(useMemoryBarrier: true);
+            //_slimSync.Exit(useMemoryBarrier: true);
         }
 
         public void Pop()
         {
-            bool lockTaken = false;
-            _slimSync.Enter(ref lockTaken);
-            if (!lockTaken)
-                Console.WriteLine("Lock isn't taken");
+            //bool lockTaken = false;
+            //_slimSync.Enter(ref lockTaken);
+            //if (!lockTaken)
+            //    Console.WriteLine("Lock isn't taken");
             //_rwl.AcquireWriterLock(TimeSpan.FromSeconds(2));
             //_rwls.EnterWriteLock();
-            //lock(_sync)
+            lock(_sync)
             _container.RemoveLast();
             //_rwls.ExitWriteLock();
             //_rwl.ReleaseWriterLock();
-            _slimSync.Exit(useMemoryBarrier: true);
+            //_slimSync.Exit(useMemoryBarrier: true);
         }
 
         public long Count()
@@ -62,7 +97,7 @@ namespace AsyncTest
 
         static void Main(string[] args)
         {
-            //TestConcurrentAccessToCollection();
+            TestConcurrentAccessToCollection();
             //TestConcurrentSimultaneousSeveralVariablesAccess();
 
             Console.WriteLine("Done");
@@ -107,9 +142,8 @@ namespace AsyncTest
             Stopwatch sw = new Stopwatch();
 
             sw.Start();
-            Task.WaitAll(CreateWorkload(7, c));
+            Task.WaitAll(CreateWorkload(3, c));
             sw.Stop();
-
 
             Console.WriteLine(c.Count());
             Console.WriteLine($"Done in {sw.Elapsed.TotalSeconds} sec");
@@ -134,22 +168,26 @@ namespace AsyncTest
 
             Console.WriteLine("Thread started");
 
-            for (int i = 0; i < ops; i++)
+            Action place = () =>
             {
-                c.Place(i);
-            }
-            for (int i = 0; i < ops; i++)
+                for (int i = 0; i < ops; i++)
+                {
+                    c.Place(i);
+                }
+            };
+
+            Action remove = () =>
             {
-                c.Pop();
-            }
-            for (int i = 0; i < ops; i++)
-            {
-                c.Place(i);
-            }
-            for (int i = 0; i < ops; i++)
-            {
-                c.Pop();
-            }
+                for (int i = 0; i < ops; i++)
+                {
+                    c.Pop();
+                }
+            };
+
+            place();
+            remove();
+            place();
+            remove();
 
             Console.WriteLine("Thread done");
         }
