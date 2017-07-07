@@ -1,0 +1,2 @@
+# ThreadsSynchronisationPlayground
+Experiments with threads synchronisation
